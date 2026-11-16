@@ -13,14 +13,14 @@ recompiles your `dirt2_game.exe` on your own computer and packages the result as
   firmware 11.20 with ShadowMountPlus), and FTP access to the console.
 - A computer with **Docker** (macOS, Linux, or Windows with WSL2), about **60 GB** free disk space
   and 16 GB of memory. Apple silicon and x86-64 both work.
-- **Colin McRae: DiRT 2**, PC version **1.1** (Steam). The folder that holds `dirt2_game.exe`.
+- **Colin McRae: DiRT 2**, PC version **1.1** (Steam). Install the game on your computer and copy everything. It is the folder that holds `dirt2_game.exe`. I used a different version, as I had only the original DVD release. So when you run XITRIX's code, if you don't have the Steam 1.1v, you will need to tell AI to ignore the SHA-256 check. Everything else works as expected.
 
 ## Build
 
 1. Get this repository:
 
    ```bash
-   git clone <this repository's URL> DiRT2-PS5
+   git clone <this repository> DiRT2-PS5
    cd DiRT2-PS5
    ```
 
@@ -80,3 +80,6 @@ port (`ps5/patches/dirt2`, `ps5/overlay`), recompiles your executable, builds SD
 FFmpeg and DXVK (`ps5/patches/dxvk`) for the console and links everything with RADV into a signed title.
 
 See [NOTICE.md](NOTICE.md) for licences and credits.
+
+## Personal Comments
+This was coded and tested with a MacBook Pro M4 Pro with 48GB of memory. On slower machines it may take a considerable amount of time to recompile the game code. If you are on a Mac, try the Metal version from XITRIX.
