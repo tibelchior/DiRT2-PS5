@@ -1,0 +1,10 @@
+# Your game files, build output and personal art stay out of the repository.
+/gamedata/*
+!/gamedata/README.md
+/dist/
+/art/*.png
+/art/*.jpg
+# The recorded shader cache is built from the game's own shaders: share it as a separate,
+# clearly labelled download, not in the repository (see cache/README.md).
+/cache/dirt2.*
+.DS_Store
