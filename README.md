@@ -14,6 +14,7 @@ recompiles your `dirt2_game.exe` on your own computer and packages the result as
 - A computer with **Docker** (macOS, Linux, or Windows with WSL2), about **60 GB** free disk space
   and 16 GB of memory. Apple silicon and x86-64 both work.
 - **Colin McRae: DiRT 2**, PC version **1.1** (Steam). Install the game on your computer and copy everything. It is the folder that holds `dirt2_game.exe`. I used a different version, as I had only the original DVD release. So when you run XITRIX's code, if you don't have the Steam 1.1v, you will need to tell AI to ignore the SHA-256 check. Everything else works as expected.
+- You should be able to play the game without a disc on your PC - meaning that you have to fix the GFWL problem and disc check before copying to the PS5
 
 ## Build
 
