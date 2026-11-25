@@ -64,7 +64,8 @@ Optional switch files, empty files or one-line files in the `data/` folder:
 | `fpscap` | frame cap, the number inside the file (for example `30`) |
 | `output` | output height: `1080`, `1440` or `2160` |
 | `bench` | log extra frame-time detail |
-| `profile` | write a CPU profile to the log |
+| `nocomcache` | turn off the Direct3D pointer cache (on by default; for comparing speed) |
+| `profile` | write a CPU profile to the log; read it with `tools/profile-report.sh dirt2.log` |
 
 ## Known limits
 

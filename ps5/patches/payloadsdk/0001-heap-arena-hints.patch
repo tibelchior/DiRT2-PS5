@@ -1,0 +1,41 @@
+diff --git a/platform/src/heap.c b/platform/src/heap.c
+index 56a3c5e..7262eac 100644
+--- a/platform/src/heap.c
++++ b/platform/src/heap.c
+@@ -71,6 +71,8 @@ static int arena_states[HEAP_ARENAS];
+ static unsigned arena_next;
+ static pthread_key_t arena_key;
+ static pthread_once_t arena_key_once = PTHREAD_ONCE_INIT;
++#define HEAP_HINTS 4096
++static uint8_t arena_hints[HEAP_HINTS];
+ static pthread_mutex_t segment_lock = PTHREAD_MUTEX_INITIALIZER;
+ 
+ static bool
+@@ -229,12 +231,27 @@ title_heap(void)
+ {
+    if (!once(&range_state, make_range, NULL))
+       return NULL;
++   /* Every allocation comes through here, and the thread's slot lives behind two
++    * calls into libc (pthread_once, pthread_getspecific): a title's main thread
++    * allocates tens of thousands of times a frame, and they were a visible share
++    * of it. A thread is told by where its stack is: the slot it was given is
++    * remembered for each 256 KiB of stack it has been seen in. Any arena serves
++    * any thread (a block is freed by the arena that made it), so a stale or
++    * shared entry costs contention at worst, never correctness. */
++   uint8_t *const hint = &arena_hints[((uintptr_t)__builtin_frame_address(0) >> 18) % HEAP_HINTS];
++   const unsigned hinted = __atomic_load_n(hint, __ATOMIC_RELAXED);
++   if (hinted) {
++      const mspace space = arena(hinted - 1);
++      if (space)
++         return space;
++   }
+    pthread_once(&arena_key_once, make_arena_key);
+    uintptr_t slot = (uintptr_t)pthread_getspecific(arena_key);
+    if (slot == 0) {
+       slot = __atomic_fetch_add(&arena_next, 1, __ATOMIC_RELAXED) % HEAP_ARENAS + 1;
+       pthread_setspecific(arena_key, (void *)slot);
+    }
++   __atomic_store_n(hint, (uint8_t)slot, __ATOMIC_RELAXED);
+    const mspace space = arena((unsigned)slot - 1);
+    return space || slot == 1 ? space : arena(0);
+ }

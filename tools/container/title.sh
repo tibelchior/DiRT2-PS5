@@ -18,6 +18,7 @@ else
     cp "$VK/sce_sys/icon0.png" "$VK/sce_sys/pic0.dds" "$VK/sce_sys/pic1.dds" "$sce/"
 fi
 
+bash "$(dirname "$0")/sdk-patch.sh"
 log "libraries"
 bash build_ps5_deps.sh
 log "DXVK"

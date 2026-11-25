@@ -2,6 +2,7 @@
 // DXVK asks the process for vkGetInstanceProcAddr (the Switch port's loader-less
 // build); answering "no such function" makes Direct3D creation fail cleanly, which
 // is where a headless run is expected to stop. The title build links RADV instead.
+#include <cstdint>
 #include <cstdio>
 
 extern "C" void* vkGetInstanceProcAddr(void* instance, const char* name) {
@@ -40,3 +41,7 @@ int keyboard_state(char*, int, int*, int*) { return 0; }
 }  // namespace ps5
 
 extern "C" void dirt2_ps5_set_output(uint32_t, uint32_t) {}
+
+// The payload build has no frame report (platform/ps5/ps5_perf.cpp is the title's).
+extern "C" void dirt2_ps5_perf_frame(double, const uint64_t*) {}
+extern "C" void dirt2_ps5_dxvk_stats(const uint64_t*, int) {}

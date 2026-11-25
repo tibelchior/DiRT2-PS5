@@ -1,5 +1,5 @@
 diff --git a/platform/sdl/sdl_main.cpp b/platform/sdl/sdl_main.cpp
-index a0b3c3c..2d137d6 100644
+index a0b3c3c..a46bcd0 100644
 --- a/platform/sdl/sdl_main.cpp
 +++ b/platform/sdl/sdl_main.cpp
 @@ -23,13 +23,17 @@
@@ -278,7 +278,7 @@ index a0b3c3c..2d137d6 100644
  #if defined(DIRT2_SWITCH_DXVK)
          if (!switch_platform::check_c11_abis()) {
              rt::log("Stopping before GPU initialization: C11 ABI self-check failed");
-@@ -760,6 +909,28 @@ int main(int argc, char** argv) {
+@@ -760,6 +909,32 @@ int main(int argc, char** argv) {
          // DIRT2_PROFILE=1, or a file named "profile" in the data folder (iOS has no environment).
          if (std::getenv("DIRT2_PROFILE") || std::filesystem::exists(data + "/profile")) rt::start_profiler();
          setup_pipeline_warmup(data);
@@ -290,6 +290,10 @@ index a0b3c3c..2d137d6 100644
 +        // Switch and Android, take the newest finished one instead (shims/d3d11/bridge.cpp).
 +        setenv("DIRT2_DX11_FRESH_EXPOSURE", "1", 0);
 +        setenv("DIRT2_DX11_ASYNC_EXPOSURE", "1", 0);
++        // Every Direct3D call from the game converts its object pointers through a registry guarded by
++        // one mutex; the profile showed the main thread spending about a third of its time in those
++        // locks. The per-thread lookup cache skips them. A file "nocomcache" turns it off, to compare.
++        if (!std::filesystem::exists(data + "/nocomcache")) setenv("DIRT2_COM_CACHE", "1", 1);
 +        // DXVK's statistics display is always created; the graphics menu's extra row switches it.
 +        setenv("DXVK_HUD", "fps,frametimes,drawcalls,pipelines,dirt2keyboard", 0);
 +        std::string dxvk_config;
@@ -307,7 +311,7 @@ index a0b3c3c..2d137d6 100644
      }
      // SDL's GameController (MFi) driver reports some pads (Backbone One) as
      // connected but never delivers their input. Without it, Xbox/PlayStation/
-@@ -775,10 +946,13 @@ int main(int argc, char** argv) {
+@@ -775,10 +950,13 @@ int main(int argc, char** argv) {
      // The D3D9-on-deko3d device owns the NWindow's buffers: SDL must not put an EGL surface on it.
      SDL_SetHint("SDL_SWITCH_NATIVE_WINDOW", "1");
  #endif
@@ -321,7 +325,7 @@ index a0b3c3c..2d137d6 100644
  #if defined(DIRT2_SWITCH_DXVK)
      if (const char* test = std::getenv("DIRT2_DX11_PREFLIGHT_ONLY"); test && std::strcmp(test, "0")) {
          // Keep game pipeline replay and HUD draws out of the isolated GPU test.
-@@ -813,19 +987,37 @@ int main(int argc, char** argv) {
+@@ -813,19 +991,37 @@ int main(int argc, char** argv) {
  #endif
      g_hw_config = data + "/C/Users/Player/Documents/My Games/DiRT2/hardwaresettings/hardware_settings_config.xml";
  
@@ -360,7 +364,7 @@ index a0b3c3c..2d137d6 100644
  
  #if defined(DIRT2_SWITCH_DXVK)
      switch_platform::start_dx11_startup_watchdog();
-@@ -835,11 +1027,25 @@ int main(int argc, char** argv) {
+@@ -835,11 +1031,25 @@ int main(int argc, char** argv) {
      // Guest call depth nests host frames. Horizon commits the whole stack up front.
  #if defined(SDL_PLATFORM_SWITCH)
      pthread_attr_setstacksize(&attr, 64u << 20);
@@ -952,7 +956,7 @@ index bb4631e..87abc09 100644
      rt::log("alcCreateContext(%p) -> %p", static_cast<void*>(d), static_cast<void*>(context));
  #endif
 diff --git a/shims/d3d11/bridge.cpp b/shims/d3d11/bridge.cpp
-index eee621e..b91b86c 100644
+index eee621e..ed97d64 100644
 --- a/shims/d3d11/bridge.cpp
 +++ b/shims/d3d11/bridge.cpp
 @@ -225,7 +225,7 @@ OVERRIDE(ID3D11Device, CreateTexture3D, dev_create_texture3d)
@@ -968,7 +972,7 @@ index eee621e..b91b86c 100644
  };
  std::map<std::pair<uint32_t, uint32_t>, MapShadow> g_maps;
  std::atomic<uint32_t> g_present_frames{0};
-+std::atomic<uint32_t> g_buffers_created{0}, g_textures_created{0};  // per log period, for the fps line
++std::atomic<uint32_t> g_buffers_created{0}, g_textures_created{0};  // cumulative; the fps line and the perf report take differences
 +std::atomic<uint64_t> g_exposure_wait_ns{0};  // time the game spent in its exposure readback Map
 +std::atomic<uint32_t> g_exposure_waits{0};
  #if defined(DIRT2_D3D11_DXVK) && defined(__SWITCH__)
@@ -1019,12 +1023,44 @@ index eee621e..b91b86c 100644
      const auto* d = Args{c}.ptr<D3D11_TEXTURE2D_DESC>(1);
      create_texture<D3D11_TEXTURE2D_DESC, ID3D11Texture2D, &ID3D11Device::CreateTexture2D>(
          c, d ? mip_count(d->MipLevels, d->Width, d->Height) * d->ArraySize : 0);
-@@ -962,9 +971,31 @@ void swap_present(X86* c) {
+@@ -928,6 +937,10 @@ void profile_dx11_frame(IDXGISwapChain* self, double present_ms) {
+ }
+ #endif
+ 
++#if defined(__PROSPERO__)
++extern "C" void dirt2_ps5_perf_frame(double present_ms, const uint64_t* cumulative);
++#endif
++
+ // Present(sync interval, flags): the render thread parks here in the background.
+ void swap_present(X86* c) {
+     const Args a{c};
+@@ -950,8 +963,14 @@ void swap_present(X86* c) {
+ #endif
+ #ifdef DIRT2_TOUCH_CONTROLLER
+     if (!(a[2] & DXGI_PRESENT_TEST)) platform::touch::present_d3d11(self);
++#endif
++#if defined(__PROSPERO__)
++    const auto present_t0 = std::chrono::steady_clock::now();
+ #endif
+     const HRESULT hr = self ? self->Present(a[1], a[2]) : E_INVALIDARG;
++#if defined(__PROSPERO__)
++    const double present_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - present_t0).count();
++#endif
+ #if defined(DIRT2_D3D11_DXVK) && defined(__SWITCH__)
+     if (timing) profile_dx11_frame(self, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - present_start).count());
+ #endif
+@@ -962,9 +981,45 @@ void swap_present(X86* c) {
      if (n == 0 || (FAILED(hr) && n < 32))
          rt::log("d3d11: Present(sync %u, flags %X) -> %08X", a[1], a[2], uint32_t(hr));
      static auto t0 = std::chrono::steady_clock::now();
 +#if defined(__PROSPERO__)
 +    rt::profile_frame();
++    {
++        const uint64_t cumulative[5] = {g_buffers_created.load(std::memory_order_relaxed), g_textures_created.load(std::memory_order_relaxed),
++                                        g_exposure_waits.load(std::memory_order_relaxed), g_exposure_wait_ns.load(std::memory_order_relaxed),
++                                        rt::slow_lookup_count()};
++        dirt2_ps5_perf_frame(present_ms, cumulative);  // platform/ps5/ps5_perf.cpp
++    }
 +#endif
 +    // The slowest frame and the frames over 25 ms in each 300: what stutter looks like.
 +    static auto last = t0;
@@ -1041,18 +1077,26 @@ index eee621e..b91b86c 100644
      if (++n % 300 == 0) {
          const auto t = std::chrono::steady_clock::now();
 -        rt::log("d3d11: %u presents, %.1f fps", n, 300.0 / std::chrono::duration<double>(t - t0).count());
-+        const uint32_t waits = g_exposure_waits.exchange(0);
-+        const double wait_ms = g_exposure_wait_ns.exchange(0) / 1e6;
++        static uint32_t last_buffers = 0, last_textures = 0, last_waits = 0;
++        static uint64_t last_wait_ns = 0;
++        const uint32_t buffers = g_buffers_created.load(), textures = g_textures_created.load(), total_waits = g_exposure_waits.load();
++        const uint64_t total_wait_ns = g_exposure_wait_ns.load();
++        const uint32_t waits = total_waits - last_waits;
++        const double wait_ms = double(total_wait_ns - last_wait_ns) / 1e6;
 +        rt::log("d3d11: %u presents, %.1f fps, slowest frame %.0f ms, %u over 25 ms; exposure readback %u x %.1f ms; %llu slow lookups, %u buffers, %u textures created", n,
 +                300.0 / std::chrono::duration<double>(t - t0).count(), worst_ms, slow, waits, waits ? wait_ms / waits : 0.0,
-+                (unsigned long long)(rt::slow_lookup_count() - last_slow), g_buffers_created.exchange(0), g_textures_created.exchange(0));
++                (unsigned long long)(rt::slow_lookup_count() - last_slow), buffers - last_buffers, textures - last_textures);
 +        last_slow = rt::slow_lookup_count();
++        last_buffers = buffers;
++        last_textures = textures;
++        last_waits = total_waits;
++        last_wait_ns = total_wait_ns;
 +        worst_ms = 0;
 +        slow = 0;
          t0 = t;
      }
      c->eax = uint32_t(hr);
-@@ -1181,6 +1212,9 @@ void output_get_desc(X86* c) {
+@@ -1181,6 +1236,9 @@ void output_get_desc(X86* c) {
  
  // D3D11CreateDeviceAndSwapChain(adapter, driver, software, flags, levels, nlevels,
  //                               sdk, swapdesc, **swapchain, **device, *level, **context)
@@ -1062,7 +1106,7 @@ index eee621e..b91b86c 100644
  STDCALL(d3d11, D3D11CreateDeviceAndSwapChain, 12) {
      IDXGIAdapter* adapter = static_cast<IDXGIAdapter*>(to_host(a[0]));
      const auto* levels = a.ptr<const D3D_FEATURE_LEVEL>(4);
-@@ -1188,6 +1222,9 @@ STDCALL(d3d11, D3D11CreateDeviceAndSwapChain, 12) {
+@@ -1188,6 +1246,9 @@ STDCALL(d3d11, D3D11CreateDeviceAndSwapChain, 12) {
      SwapInfo info;
      const bool swap = a[7] && a[8];
      if (swap && !prepare_swap_chain(a[7], d, info)) return uint32_t(E_INVALIDARG);

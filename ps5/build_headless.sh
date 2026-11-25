@@ -90,7 +90,8 @@ compile ps5_platform platform/ps5/ps5_platform.cpp -Iruntime/include
 if [ $TITLE = 1 ]; then
     compile ps5_vulkan platform/ps5/ps5_vulkan.cpp -Iruntime/include -I"$RADV/include"
     compile ps5_console platform/ps5/ps5_console.cpp -Iruntime/include
-    VULKAN_OBJ="$OBJ/ps5_vulkan.o $OBJ/ps5_console.o"
+    compile ps5_perf platform/ps5/ps5_perf.cpp -Iruntime/include
+    VULKAN_OBJ="$OBJ/ps5_vulkan.o $OBJ/ps5_console.o $OBJ/ps5_perf.o"
 else
     compile headless_vulkan "$SPIKE/headless_vulkan.cpp"
     VULKAN_OBJ=$OBJ/headless_vulkan.o

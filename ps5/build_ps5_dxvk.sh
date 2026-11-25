@@ -17,6 +17,12 @@ SRC=$OUTROOT/ps5-src/dxvk
 BLD=$OUTROOT/ps5-dxvk/$MODE
 BASE=$ROOT/Dirt2/build/src/dxvk
 [ -d "$BASE" ] || { echo "run Dirt2/tools/scripts/prepare_sources.sh first" >&2; exit 1; }
+# The copy is patched once, so a changed patch set needs a fresh copy (and a full DXVK rebuild).
+PATCHES=$(cat "$ROOT"/ps5-spike/patches/dxvk/*.patch | shasum | cut -d' ' -f1)
+if [ -d "$SRC" ] && [ "$(cat "$SRC/.ps5-patches" 2> /dev/null)" != "$PATCHES" ]; then
+    echo "DXVK patches changed: starting from a fresh copy"
+    rm -rf "$SRC" "$OUTROOT/ps5-dxvk"
+fi
 if [ ! -d "$SRC" ]; then
     mkdir -p "$OUTROOT/ps5-src"
     cp -R "$BASE" "$SRC"
@@ -25,6 +31,7 @@ if [ ! -d "$SRC" ]; then
     for p in "$ROOT"/ps5-spike/patches/dxvk/*.patch; do
         [ -f "$p" ] && patch -s -p1 -d "$SRC" < "$p"
     done
+    echo "$PATCHES" > "$SRC/.ps5-patches"
 fi
 
 CROSS=$OUTROOT/ps5-dxvk/ps5.cross

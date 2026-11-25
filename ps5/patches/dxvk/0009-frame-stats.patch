@@ -1,0 +1,65 @@
+--- a/src/d3d11/d3d11_swapchain.cpp	2026-11-23 13:48:16.237415512 +0000
++++ b/src/d3d11/d3d11_swapchain.cpp	2026-11-23 13:48:16.238603262 +0000
+@@ -10,6 +10,10 @@
+ #include <d3d11_composition_vert.h>
+ #include <d3d11_composition_frag.h>
+ 
++#if defined(__PROSPERO__)
++extern "C" void dirt2_ps5_dxvk_stats(const uint64_t* values, int count);
++#endif
++
+ namespace dxvk {
+ 
+   static uint16_t MapGammaControlPoint(float x) {
+@@ -253,6 +257,27 @@
+   }
+ 
+ 
++#if defined(__PROSPERO__)
++  // Once per frame, the counters the console build logs with its frame times (the order is
++  // part of the contract with platform/ps5/ps5_perf.cpp).
++  void D3D11SwapChain::reportFrameStats() {
++    const DxvkStatCounters c = m_device->getStatCounters();
++    static const DxvkStatCounter order[] = {
++      DxvkStatCounter::CmdDrawCalls,      DxvkStatCounter::CmdRenderPassCount, DxvkStatCounter::PipeCountGraphics,
++      DxvkStatCounter::PipeCountLibrary,  DxvkStatCounter::PipeCountCompute,   DxvkStatCounter::QueueSubmitCount,
++      DxvkStatCounter::GpuSyncCount,      DxvkStatCounter::GpuSyncTicks,       DxvkStatCounter::GpuIdleTicks,
++      DxvkStatCounter::CsSyncCount,       DxvkStatCounter::CsSyncTicks,        DxvkStatCounter::CsIdleTicks,
++      DxvkStatCounter::CsChunkCount,      DxvkStatCounter::CmdBarrierCount,    DxvkStatCounter::DescriptorSetCount,
++      DxvkStatCounter::PipeTasksDone,     DxvkStatCounter::PipeTasksTotal,
++    };
++    uint64_t values[sizeof(order) / sizeof(order[0])];
++    for (size_t i = 0; i < sizeof(order) / sizeof(order[0]); i++)
++      values[i] = c.getCtr(order[i]);
++    dirt2_ps5_dxvk_stats(values, int(sizeof(order) / sizeof(order[0])));
++  }
++#endif
++
++
+   HRESULT STDMETHODCALLTYPE D3D11SwapChain::Present(
+           UINT                      SyncInterval,
+           UINT                      PresentFlags,
+@@ -288,6 +313,10 @@
+     // we do not increment the frame ID in those situations.
+     SyncFrameLatency();
+ 
++#if defined(__PROSPERO__)
++    reportFrameStats();
++#endif
++
+     // Ignore latency stuff if presentation failed
+     DxvkLatencyStats latencyStats = { };
+ 
+--- a/src/d3d11/d3d11_swapchain.h	2026-11-23 13:48:16.238067054 +0000
++++ b/src/d3d11/d3d11_swapchain.h	2026-11-23 13:53:54.533070877 +0000
+@@ -172,6 +172,10 @@
+ 
+     void SyncFrameLatency();
+ 
++#if defined(__PROSPERO__)
++    void reportFrameStats();
++#endif
++
+     uint32_t GetActualFrameLatency();
+ 
+     VkSurfaceFormatKHR GetSurfaceFormat(DXGI_FORMAT Format);

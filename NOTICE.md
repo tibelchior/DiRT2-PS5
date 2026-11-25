@@ -16,3 +16,9 @@ data, no Sony software and no keys.
 - **Colin McRae: DiRT 2** is the property of Codemasters. This project is not affiliated with or
   endorsed by Codemasters, Electronic Arts or Sony. You need your own legal copy of the game.
 - The shader cache, if you download it, was generated from the game's own shaders.
+
+## Patches to PS5_PayloadSDK
+
+`ps5/patches/payloadsdk/` holds a small change to the SDK's title heap (GPL-3.0, like the SDK):
+it remembers each thread's allocation arena by stack position instead of calling into libc on every
+allocation. `tools/container/sdk-patch.sh` applies it while building the title.
