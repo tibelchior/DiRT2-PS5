@@ -20,9 +20,11 @@ recompiles your `dirt2_game.exe` on your own computer and packages the result as
 1. Get this repository:
 
    ```bash
-   git clone <this repository> DiRT2-PS5
+   git clone https://github.com/tibelchior/DiRT2-PS5.git DiRT2-PS5
    cd DiRT2-PS5
    ```
+
+   Or unzip the release's `DiRT2-PS5-v<version>.zip` and `cd` into the folder.
 
 2. Copy your game folder into `gamedata/`, so that `gamedata/Dirt 2/dirt2_game.exe` exists.
 3. Optional: put `icon.png` and `wallpaper.png` in `art/` for your own home-screen art, and the
@@ -43,7 +45,7 @@ recompiles your `dirt2_game.exe` on your own computer and packages the result as
 ## Install on the console
 
 1. Copy `dist/PPSA99777` to `/data/homebrew/PPSA99777` with FTP (about 10 GB).
-2. Let ShadowMountPlus rescan, then start **DiRT 2 Recompiled** from the home screen.
+2. Let ShadowMountPlus rescan, then start **DiRT 2** from the home screen.
 
 Your profile, settings and log are in `/data/homebrew/PPSA99777/data/` (`dirt2.log` is the log).
 
@@ -69,9 +71,26 @@ Optional switch files, empty files or one-line files in the `data/` folder:
 
 ## Known limits
 
-- Races run at about 40 fps: the game's main thread is the limit, not the GPU.
+- Races run at about 45 to 60 fps: the busiest scenes drop below 60 because the game's main thread
+  is the limit, not the GPU.
 - Without the shader cache, the first races stutter while shaders compile.
 - No system keyboard (the console does not let titles use it); the on-screen keyboard is our own.
+
+## Packaging a release
+
+```bash
+tools/package-release.sh 1.0.0
+```
+
+writes `dist/DiRT2-PS5-v1.0.0.zip` (the port kit: sources and scripts only) and, when the three
+cache files are in `cache/`, `dist/DiRT2-PS5-shader-cache-v1.0.0.zip`.
+
+```bash
+tools/package-private.sh 1.0.0
+```
+
+zips your built title without the game files, for your own use. **Do not share it:** its
+`eboot.bin` holds the game's code recompiled from your `dirt2_game.exe`.
 
 ## How it is built
 
